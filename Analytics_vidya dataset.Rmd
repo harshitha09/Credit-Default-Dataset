@@ -1,0 +1,354 @@
+---
+title: "Analytics_Vidhya Project(credit_default)"
+author: "HARSHITHA MEKALA"
+date: "13 June 2018"
+output: html_document
+---
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(readxl)
+traindata <- readxl::read_xlsx("E:/Machine Learning/My practice/Kaggle_AV projects/credit default_Analytics vidhya/AVtraindata.xlsx")
+
+testdata <- readxl::read_xlsx("E:/Machine Learning/My practice/Kaggle_AV projects/credit default_Analytics vidhya/AVtestdata.xlsx")
+
+```
+
+# step1 : Problem Defination
+
+```{r}
+
+"P.S : Here we need to find the prediction of default based on the different parameters given"
+
+"default here means how accurately a person can repay the loan in a given period"
+```
+
+
+# step2 : Hypothesis Generation
+
+```{r}
+
+"There can be different parameters that can be related for a credit default of a person.
+Some of them are like :
+  
+* Age
+* Income
+* Education
+* Sex
+* Marital status
+* Race
+* Country/State
+* Skills
+* Company type
+* Total working_hours
+* Occupation
+* Industry type
+* Ownership or property
+* Total work experience
+* Designation/ Job role
+* Is his/her profile rare? ....
+
+
+Now lets check which of the above names are present in our train data. If many of the names are not there then we can create new variables using feature engineering method."
+
+names(traindata)
+
+""ID"             "Age"            "Workclass"      "Education"      "Marital.Status"
+ "Occupation"     "Relationship"   "Race"           "Sex"            "Hours.Per.Week"
+ "Native.Country" "Income.Group""
+```
+
+# EDA
+## Finding the % of missing values in train data
+
+```{r}
+
+mis <- function(x){
+  sapply(x, function(y) sum(is.na(y))/length(y)*100)
+}
+mis(traindata)
+
+# very less % of missing values. So we can proceed furthur without any imputation techniques.
+```
+
+## Finding the % of missing values in test data
+
+```{r}
+
+mis <- function(x){
+  sapply(x, function(y) sum(is.na(y))/length(y)*100)
+}
+mis(testdata)
+
+# very less % of missing values. So we can proceed furthur without any imputation techniques.
+```
+
+# Finding the % of outliers from train data
+
+```{r}
+
+out1 <- function(x){
+  num_col <- names(x)[sapply(x,is.numeric)]
+  x <- x[,num_col]
+  sapply(x, function(y) length(boxplot.stats(y)$out)/sum(!is.na(y))*100)
+}
+out1(traindata)
+
+```
+
+# Finding the outliers from test data
+
+```{r}
+out2 <- function(x){
+  numcol <- names(x)[sapply(x, is.numeric)]
+  x <- x[,numcol]
+  sapply(x, function(y) length(boxplot.stats(y)$out)/sum(!is.na(y))*100)
+}
+out2(testdata)
+
+```
+
+
+```{r}
+
+sapply(traindata,class)
+sapply(traindata,colnames)
+
+# Here table gives the count values of each level
+
+table(traindata$Race)
+table(traindata$Workclass)
+table(traindata$Occupation)
+
+```
+
+
+# pastecs give the better summary of the numeric data
+```{r}
+
+library(pastecs)
+options(scipen = 100)
+options(digits = 2)
+stat.desc(traindata)
+
+```
+
+# For categorical variable
+
+"In case of categorical variables, we generally use frequency table to understand distribution of each category. It can be measured using two metrics, Count and Count% against each category.
+
+Before checking the count of categories, lets check the number of unique values in each categorical variable."
+
+```{r}
+apply(traindata,2, function(x) {length(unique(x))})
+
+table(traindata$Race)
+as.matrix(prop.table(table(traindata$Race)))
+```
+
+# Univariate analysis
+
+# Analyzing Native-Country
+```{r}
+head(sort(table(traindata$Native.Country),decreasing = TRUE),20)
+
+# prop.table of above obs
+
+head(round(sort(prop.table(table(traindata$Native.Country)),decreasing = TRUE),6),20)
+
+IQR(traindata$Age)
+
+colSums(is.na(traindata))
+
+```
+
+"Multivariate Analysis finds out the relationship between two or more variables. Here, we look for association and disassociation between variables at a pre-defined significance level.
+
+The type of visualization technique to use depends on the type variable. Thus, there can be 3 combinations of the 2 types of variables:
+
+categorical - categorical
+continuous - continuous
+categorical - continuous"
+
+```{r}
+# for two category columns --> chi-square test
+
+install.packages("gmodels")
+library(gmodels)
+CrossTable(traindata$Sex, traindata$Income.Group )
+
+"This table reveals all the important aspects between these two variables. Here are the key findings:
+
+Out of total Females, 89.1% females have income <= 50K and only ~ 11% females have income >50K
+Out of total people which have income >50K, only 15% are females and 85% are males"
+
+```
+
+# for two continuous columns
+
+```{r}
+
+"In this case, we plot a scatter chart and strive to make interpretations between Age and Hours-Per-Week."
+
+"since Age is continuous value we create it into intervles"
+
+d <- cut(traindata$Age, breaks = 15, labels = FALSE, include.lowest = TRUE)
+d <- as.factor(d)
+class(d)
+
+ggplot(traindata, aes(x = d, y = Hours.Per.Week)) + geom_jitter()
+
+"here we observe there is no correlation between these 2 variables"
+
+```
+
+# Categorical-Continuous Combination
+
+#In this case, we generally make box-plot using ggplot for each category. They not only helps us to understand the relationship between variables but also identifies outliers easily.
+
+```{r}
+
+ggplot(traindata, aes(x = Sex, y = Hours.Per.Week)) + geom_boxplot() + labs(title = "Boxplot")
+
+```
+
+
+```{r}
+CrossTable(traindata$Race, traindata$Workclass)
+
+```
+
+
+```{r}
+CrossTable(traindata$Education, traindata$Income.Group)
+```
+
+# imputing the missing values using Mode 
+```{r}
+table(is.na(traindata))
+
+# Each column wise
+
+colSums(is.na(traindata))
+
+colSums(is.na(testdata))
+
+install.packages("mlr", repos = 'http://cran.us.r-project.org')
+library(mlr)
+traindata$Occupation <- as.factor(traindata$Occupation)
+traindata$Native.Country <- as.factor(traindata$Native.Country)
+traindata$Workclass <- as.factor(traindata$Workclass)
+
+imputed_data <- impute(traindata, classes = list(factor=imputeMode()))
+traindata <- imputed_data$data
+colSums(is.na(traindata))
+
+# do the same with test data
+
+testdata$Occupation <- as.factor(testdata$Occupation)
+testdata$Native.Country <- as.factor(testdata$Native.Country)
+testdata$Workclass <- as.factor(testdata$Workclass)
+
+imputed_data <- impute(testdata, classes = list(factor=imputeMode()))
+testdata <- imputed_data$data
+colSums(is.na(testdata))
+
+```
+
+# Outlier treatment
+
+```{r}
+ggplot(traindata, aes(ID, Age)) +
+  geom_jitter()
+
+ggplot(traindata, aes(ID, Hours.Per.Week)) +
+  geom_jitter()
+
+"In both of the above cases, you would notice that there are no real outliers. One thing to note here is that outliers need not just be a value outside the general cluster of data as shown in the video lecture. You should also look for values which are not practically possible. For instance, if any of the age or hours per week was negative, then we should certainly treat it like a missing value."
+
+```
+
+# Data preprocessing
+
+```{r}
+table(traindata$Income.Group)
+traindata$Income.Group <- ifelse(traindata$Income.Group == "<=50K", 0, 1)
+length(traindata$Income.Group)
+traindata$Income.Group <- as.factor(traindata$Income.Group)
+```
+
+
+# Removing the idenitifier variable from traindata
+```{r}
+traindata <- subset(traindata, select = c(-ID))
+names(traindata)
+```
+
+# Building the model
+"For building decision tree, we'll use rpart() package which is simple to use and understand."
+
+```{r}
+library(rpart)
+set.seed(123)
+
+traindata_tree <- rpart(Income.Group~., data = traindata, method = "class", control = rpart.control(minsplit = 20, minbucket = 100, maxdepth = 10, xval = 5))
+
+summary(traindata_tree)
+
+# Quick summary of these parameters :
+
+#1 minsplit - refers to minimum number of observations which must exist in a node to split
+
+#2 minbucket - refers to minimum number of observations which must exist in terminal nodes(leaf)
+
+#3 maxdepth - refers to depth of the tree
+
+#4 xval - refers to cross validation
+
+```
+
+# for better understanding its good to plot the tree
+
+```{r}
+library(rpart.plot)
+rpart.plot(traindata_tree)
+
+```
+
+# predictions for the train and test data
+
+```{r}
+prediction_train <- predict(traindata_tree, newdata = traindata, type = "class")
+
+prediction_test <- predict(traindata_tree, newdata = testdata, type = "class")
+
+```
+
+# Analyze the results
+```{r}
+# load the require libraries
+
+require(caret)
+require(ggplot2)
+
+# for train accuracy
+confusionMatrix(prediction_train, traindata$Income.Group)
+```
+
+# create the data frame of final prediction
+```{r}
+solution_frame <- data.frame(ID = testdata$ID, Income.Group = prediction_test)
+
+```
+
+# writing the solution file
+
+```{r}
+write.csv(solution_frame, file = "final_solution.csv")
+```
+
+
+
